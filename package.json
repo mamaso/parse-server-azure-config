@@ -1,0 +1,18 @@
+{
+  "name": "parse-server-azure-app",
+  "version": "0.0.1",
+  "description": "A parse server module to run on azure web apps",
+  "main": "index.js",
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "author": "Matt Mason",
+  "license": "MIT",
+  "dependencies": {
+    "deeply": "^2.0.0",
+    "express": "^4.0.0",
+    "parse-server": "^2.2.7",
+    "parse-server-azure-push": "^1.0.2",
+    "parse-server-azure-storage": "^1.0.2"
+  }
+}
