@@ -1,59 +1,110 @@
-var express = require('express');
 var AzurePushAdapter = require('parse-server-azure-push');
 var AzureStorageAdapter = require('parse-server-azure-storage').AzureStorageAdapter;
-var ParseServer = require('parse-server').ParseServer;
-var merge = require('deeply');
+var DefaultFilesAdapter = require('parse-server/lib/Adapters/Files/FilesAdapter').FilesAdapter;
+var DefaultPushAdapter = require('parse-server/lib/Adapters/Push/PushAdapter').PushAdapter;
+var util = require('util');
 
-module.exports = fromUser => {
-  fromUser = fromUser || {}
-  var config = {};
-  var fromFile = {};
-  var mountPath = '/parse';
+module.exports = (siteRoot, options) => {
+  var push = {
+    HubName: process.env.MS_NotificationHubName || (process.env.WEBSITE_SITE_NAME? process.env.WEBSITE_SITE_NAME + '-hub' : undefined),
+    ConnectionString: process.env.CUSTOMCONNSTR_MS_NotificationHubConnectionString
+  };
 
-  var defaults = {
-    databaseURI: 'mongodb://localhost:27017/dev',
-    serverURL: 'http://localhost:1337' + mountPath,
-    storage: {
-      container: 'parse',
-      adapter: AzureStorageAdapter,
-      directAccess: true
+  var storage = {
+    name: process.env.STORAGE_NAME,
+    container: process.env.STORAGE_CONTAINER,
+    accessKey: process.env.STORAGE_KEY,
+    directAccess: process.env.STORAGE_DIRECTACCESS
+  };
+
+  var server = {
+    appId: process.env.APP_ID || 'appId',
+    masterKey: process.env.MASTER_KEY || 'masterKey',
+    databaseURI: process.env.DATABASE_URI || 'mongodb://localhost:27017/dev',
+    serverURL: (process.env.SERVER_URL || 'http://localhost:1337') + '/parse',
+    cloud: siteRoot + '/cloud/main.js',
+    logFolder: siteRoot + '/logs',
+    filesAdapter: () => {
+      if (validate('storage', ['name', 'container', 'accessKey']))
+        return new AzureStorageAdapter(storage.name, storage.container, storage);
+      else {
+        return new DefaultFilesAdapter();
+      }
     },
-    filesAdapter: _ => new config.storage.adapter(config.storage.name, config.storage.container, config.storage),
     push: { 
-      adapter: AzurePushAdapter 
+      adapter: () => {
+        if (validate('push', ['HubName', 'ConnectionString']))
+          return AzurePushAdapter(push);
+        else {
+          return new DefaultPushAdapter();
+        } 
+      }
     },
     allowClientClassCreation: false,
     enableAnonymousUsers: false
+  };
+
+  var dashboard = {
+    apps: [
+      {
+        appId: server.appId,
+        serverURL: server.serverURL,
+        masterKey: server.masterKey,
+        appName: process.env.WEBSITE_SITE_NAME || 'Parse Server Azure'
+      }
+    ],
+    users: [
+      {
+        user: server.appId,
+        pass: server.masterKey
+      }
+    ]
+  };
+
+  var api = {
+    server: server,
+    dashboard: dashboard,
+    push: push,
+    storage: storage
+  };
+
+  options.defaults && loadConfigFile(options.defaults);
+  options.secrets && loadConfigFile(options.secrets);
+
+  console.log('parse-server-azure-config generated the following configuration:');
+  console.log(util.inspect(api, { showHidden: false, depth: 4 }))
+
+  return api;
+
+  function validate(configName, props) {
+    var valid = props.reduce((configValid, prop) => {
+      if (!api[configName][prop]) 
+        console.log(`Missing required property '${prop}' in ${configName} configuration`);
+      return configValid && api[configName][prop];
+    }, true);
+
+    if (!valid) 
+      console.log(`Will not setup parse-server-azure-${configName} due to invalid configuration`);
+    return valid;
   }
 
-  var fromEnvironment = {
-    appId: process.env.APP_ID,
-    masterKEY: process.env.MASTER_KEY,
-    databaseURI: process.env.DATABASE_URI,
-    serverURL: process.env.SERVER_URL + mountPath,
-    storage: {
-      name: process.env.STORAGE_NAME,
-      container: process.env.STORAGE_CONTAINER,
-      accessKey: process.env.STORAGE_KEY,
-      directAccess: process.env.STORAGE_DIRECTACCESS
-    }
-    allowClientClassCreation: process.env.ALLOW_CLIENT_CLASS_CREATION,
-    enableAnonymousUsers: process.env.ENABLE_ANONYMOUS_USERS,
-  }
-
-  if (fromUser.configurationFile) {
+  function loadConfigFile(filename) {
     try {
-      fromFile = require(fromUser.configurationFile);
-    } catch (e) {
-      console.error(e);
+      var config = require(`${siteRoot}/${filename}`);
+
+      Object.assign(server, config.server);
+      Object.assign(push, config.push);
+      Object.assign(storage, config.storage);
+
+      // concat apps and users
+      Object.keys(dashboard).forEach((key) => {
+        var val = config && config.dashboard && config.dashboard[key];
+        if (val)
+          dashboard[key] = dashboard[key].concat(val);
+      });
+    } catch (err) { 
+      console.error(err);
+      console.log(`Couldn't load configuration from ${siteRoot}/${filename}`) 
     }
   }
-
-  Object.assign(config, merge(defaults, fromFile, fromUser, fromEnvironment));
-  console.log(config);
-
-  var app = express();
-  app.use(mountPath, new ParseServer(config));
-  return app;
 }
-
