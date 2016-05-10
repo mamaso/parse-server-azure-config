@@ -7,6 +7,7 @@ Exports an object with default configurations for storage, push, server, and das
 let config = require('parse-server-azure-config');
 let ParseServer = require('parse-server').ParseServer;
 let ParseDashboard = require('parse-dashboard');
+let express = require('express');
 
 let options = {
   defaults: 'config.js', // file to load with default user configuration
@@ -20,6 +21,9 @@ let {
   dashboard   // parse dashboard configuration options
 } = config(__dirname, options);
 
-let serverApp = new ParseServer(server);
-let serverDash = ParseDashboard(dashboard);
+let app = express();
+app.use('/parse', new ParseServer(server));
+app.use('/parse-dashboard', ParseDashboard(dashboard));
+
+app.listen(process.env.PORT);
 ```
