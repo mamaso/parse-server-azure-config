@@ -5,6 +5,7 @@ var DefaultPushAdapter = require('parse-server/lib/Adapters/Push/PushAdapter').P
 var util = require('util');
 
 module.exports = (siteRoot, options) => {
+  options = options || {};
   var push = {
     HubName: process.env.MS_NotificationHubName || (process.env.WEBSITE_SITE_NAME? process.env.WEBSITE_SITE_NAME + '-hub' : undefined),
     ConnectionString: process.env.CUSTOMCONNSTR_MS_NotificationHubConnectionString
@@ -12,9 +13,9 @@ module.exports = (siteRoot, options) => {
 
   var storage = {
     name: process.env.STORAGE_NAME,
-    container: process.env.STORAGE_CONTAINER,
+    container: process.env.STORAGE_CONTAINER || 'parse';
     accessKey: process.env.STORAGE_KEY,
-    directAccess: process.env.STORAGE_DIRECTACCESS
+    directAccess: true;
   };
 
   var server = {
@@ -61,15 +62,15 @@ module.exports = (siteRoot, options) => {
     ]
   };
 
+  loadConfigFile(options.config || 'config.js');
+  loadConfigFile(options.local || 'local.js');
+
   var api = {
     server: server,
     dashboard: dashboard,
     push: push,
     storage: storage
   };
-
-  options.defaults && loadConfigFile(options.defaults);
-  options.secrets && loadConfigFile(options.secrets);
 
   console.log('parse-server-azure-config generated the following configuration:');
   console.log(util.inspect(api, { showHidden: false, depth: 4 }))
