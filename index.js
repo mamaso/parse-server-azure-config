@@ -6,6 +6,7 @@ var util = require('util');
 
 module.exports = (siteRoot, options) => {
   options = options || {};
+
   var push = {
     HubName: process.env.MS_NotificationHubName || (process.env.WEBSITE_SITE_NAME? process.env.WEBSITE_SITE_NAME + '-hub' : undefined),
     ConnectionString: process.env.CUSTOMCONNSTR_MS_NotificationHubConnectionString
@@ -13,9 +14,9 @@ module.exports = (siteRoot, options) => {
 
   var storage = {
     name: process.env.STORAGE_NAME,
-    container: process.env.STORAGE_CONTAINER || 'parse';
+    container: process.env.STORAGE_CONTAINER || 'parse',
     accessKey: process.env.STORAGE_KEY,
-    directAccess: true;
+    directAccess: true
   };
 
   var server = {
